@@ -1,0 +1,1 @@
+very simple visual odometry pipeline using 8-point algorithm for essential matrix. stepping stone for learning slam
