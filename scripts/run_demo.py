@@ -68,12 +68,12 @@ def run_pair(img1_path, img2_path, visualize=False):
     if ds1 is None or ds2 is None:
         raise ValueError(f"Could not compute descriptors for {img1_path} and {img2_path}.")
 
-    odometry.match_keypoints(ds1, ds2, img1, img2, kp1, kp2)
+    xl, xr = odometry.match_keypoints(ds1, ds2, img1, img2, kp1, kp2)
     print(
         f"PASS {img1_path.name} -> {img2_path.name}: "
         f"{len(kp1)} keypoints, {len(kp2)} keypoints"
     )
-
+    odometry.form_epipolar_constraint(xr, xl)
 
 def main():
     args = parse_args()
@@ -84,6 +84,8 @@ def main():
 
     for img1_path, img2_path in pairs:
         run_pair(img1_path, img2_path, visualize=args.visualize)
+
+    
 
 
 if __name__ == "__main__":
