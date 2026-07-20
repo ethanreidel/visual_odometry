@@ -9,8 +9,11 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from visual_odometry import odometry
-from visual_odometry.io import DATA_DIR, load_image
-from visual_odometry.visualization import show_images
+from visual_odometry.io import load_image
+from visual_odometry.visualization import show_images, show_image_stream
+
+
+DEMO_DATA_DIR = REPO_ROOT / "data" / "kitti_sample"
 
 
 def parse_args():
@@ -26,7 +29,7 @@ def parse_args():
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=DATA_DIR,
+        default=DEMO_DATA_DIR,
         help="Directory of images to use when no explicit image paths are provided.",
     )
     parser.add_argument(
@@ -82,8 +85,18 @@ def main():
     if args.limit is not None:
         pairs = pairs[: args.limit]
 
-    for img1_path, img2_path in pairs:
-        run_pair(img1_path, img2_path, visualize=args.visualize)
+    #for img1_path, img2_path in pairs:
+    #    run_pair(img1_path, img2_path, visualize=args.visualize)
+
+
+
+    images = []
+    print(len(paths))
+    for i in range(len(paths)): #paths array of files
+        images.append(load_image(paths[i]))
+    
+    show_image_stream(images)
+        
 
     
 

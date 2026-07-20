@@ -113,16 +113,27 @@ def form_epipolar_constraint(x_r, x_l, K=None):
 
     print(U.shape, sigma.shape, V_t.shape)
 
-    e = V_t[:, -1]
+    e = V_t[:, -1] #take last column of Vt? directions in the input space of A? (space where xl lives)
 
     E = e.reshape((3, 3))
 
     U, sigma, V_t = np.linalg.svd(E) #perform svd again to get R and t
-    print(f"sigma matrix from E decomposed: 3rd singular value may not equal 0: {sigma}")
-    sigma_fixed = np.diag([1, 1, 0]) #enforces rank 2 if we replace sigma with this, 
+    sigma_fixed = np.diag([1, 1, 0]) #enforces rank 2 if we replace sigma with this to rebuild E cleanly
     E_clean = U @ sigma_fixed @ V_t 
 
     U, S, Vt = np.linalg.svd(E_clean)
+
+    #this part is slightly magic not going to lie, but i think it's dealing with the sign ambiguity when determining R
+    W = np.array([[0,-1,0],[1,0,0],[0,0,1]])
+    R1 = U @ W @ Vt
+    R2 = U @ W.T @ Vt
+
+    #U[:, 2] takes the 3rd column of U corresponding to the smallest singular vector
+    #E^T U[:, 2] = 0, direction that E^T maps to zero.
+    t1 = U[:, 2]
+    t2 = -U[:, 2]
+
+    candidates = [(R1, t1), (R1, t2), (R2, t1), (R2, t2)]
 
     #we'll need to do point normalization for stability? clamping values bvetween 0 and 1 i guess
 
