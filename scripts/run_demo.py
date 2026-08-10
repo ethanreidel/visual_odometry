@@ -10,10 +10,17 @@ if str(SRC_DIR) not in sys.path:
 
 from visual_odometry import odometry
 from visual_odometry.io import load_image
-from visual_odometry.visualization import show_images, show_image_stream
+from visual_odometry.visualization import show_image_stream
 
 
 DEMO_DATA_DIR = REPO_ROOT / "data" / "kitti_sample"
+
+
+def positive_int(value):
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
 
 
 def parse_args():
@@ -41,7 +48,20 @@ def parse_args():
     parser.add_argument(
         "--visualize",
         action="store_true",
-        help="Show keypoint visualizations for each tested image pair.",
+        help="Overlay SIFT + FLANN motion tracks on each current frame.",
+    )
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.1,
+        help="Seconds between match visualizations (default: 0.1).",
+    )
+    parser.add_argument(
+        "--max-display-matches",
+        type=positive_int,
+        default=None,
+        metavar="N",
+        help="Show at most N strongest matches without changing odometry (default: all).",
     )
     return parser.parse_args()
 
@@ -60,23 +80,44 @@ def discover_images(data_dir):
     return paths
 
 
-def run_pair(img1_path, img2_path, visualize=False):
+def run_pair(img1_path, img2_path, visualize=False, max_display_matches=None):
     img1 = load_image(img1_path)
     img2 = load_image(img2_path)
 
-    if visualize:
-        odometry.show_images = show_images
-
-    kp1, ds1, kp2, ds2 = odometry.calculate_keypoints(img1, img2, draw=visualize)
+    kp1, ds1, kp2, ds2 = odometry.calculate_keypoints(img1, img2)
     if ds1 is None or ds2 is None:
         raise ValueError(f"Could not compute descriptors for {img1_path} and {img2_path}.")
 
-    xl, xr = odometry.match_keypoints(ds1, ds2, img1, img2, kp1, kp2)
+    match_result = odometry.match_keypoints(
+        ds1,
+        ds2,
+        img1,
+        img2,
+        kp1,
+        kp2,
+        return_visualization=visualize,
+        max_display_matches=max_display_matches,
+    )
+    if visualize:
+        xl, xr, match_view = match_result
+    else:
+        xl, xr = match_result
     print(
         f"PASS {img1_path.name} -> {img2_path.name}: "
-        f"{len(kp1)} keypoints, {len(kp2)} keypoints"
+        f"{len(kp1)} keypoints, {len(kp2)} keypoints, {len(xl)} matches"
     )
     odometry.form_epipolar_constraint(xr, xl)
+    return match_view if visualize else None
+
+
+def match_visualizations(pairs, max_display_matches=None):
+    for img1_path, img2_path in pairs:
+        yield run_pair(
+            img1_path,
+            img2_path,
+            visualize=True,
+            max_display_matches=max_display_matches,
+        )
 
 def main():
     args = parse_args()
@@ -85,21 +126,14 @@ def main():
     if args.limit is not None:
         pairs = pairs[: args.limit]
 
-    #for img1_path, img2_path in pairs:
-    #    run_pair(img1_path, img2_path, visualize=args.visualize)
-
-
-
-    images = []
-    print(len(paths))
-    for i in range(len(paths)): #paths array of files
-        images.append(load_image(paths[i]))
-    
-    show_image_stream(images)
-        
-
-    
-
+    if args.visualize:
+        show_image_stream(
+            match_visualizations(pairs, args.max_display_matches),
+            interval=args.interval,
+        )
+    else:
+        for img1_path, img2_path in pairs:
+            run_pair(img1_path, img2_path)
 
 if __name__ == "__main__":
     main()
