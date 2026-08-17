@@ -150,6 +150,47 @@ def find_best_R_and_t(candidates, K_inv, x1, x2):
 
     return best_R, best_t
 
+
+def triangulate(x1, x2, K, R, t):
+    """
+    triangulation definition: given same image point seen by two cameras, where is the corresponding 3d point?
+    
+    using direct linear transform (solves Ax=0), we can figure out where the intersection of two rays are.
+    since there will be some noise the rays will probably not perfectly line up
+
+    we have the relationship x ~ PX which in english means the 2d image point relates to the 3d world point (X) with some scale
+    or equal up to some scale.
+
+    we know a few things: x1, x2, P1, and P2 and we want X
+    x1 ~ P1X
+    x2 ~ P2X
+    
+    DLT magically forms the A matrix which we use to solve the system AX=0 via SVD viola 
+    in english: A encodes -> given camera positions and pixel observations, what 3D point could have produced all of them
+    AX=0 means finding X that best obeys the four rules in A
+
+    this funny AX=0 idea comes up a lot it seems. essential and fundamental matrix estimations, plane estimations, triangulation
+    """
+
+    eye = np.eye(3)
+    temp = np.zeros((3, 1))
+    P1_noK = np.hstack((eye, temp))
+    P1 = K @ P1_noK
+
+    Rt = np.hstack((R, t.reshape(3, 1)))
+    P2 = K @ Rt
+
+    A_0 = x1[0]*P1[2]- x1[2] * P1[0]
+    A_1 = x1[1]*P1[2]- x1[2] * P1[1]
+    A_2 = x2[0]*P2[2]- x2[2] * P2[0]
+    A_3 = x2[1]*P2[2]- x2[2] * P2[1]
+    A = np.vstack((A_0, A_1, A_2, A_3))
+
+    _, _, Vt = np.linalg.svd(A)
+    X = Vt[-1]
+    X = X/X[3]+1e-8
+    return X
+
 def visual_odometry_pipeline(x_r, x_l, K=None):
     """
     forms epipolar constraint. x_r^TEx_l=0
@@ -199,6 +240,8 @@ def visual_odometry_pipeline(x_r, x_l, K=None):
     #P is camera matrix built from R and t candidates
     #X is found via SVD
     best_R, best_t = find_best_R_and_t(candidates, K_inv, x_r, x_l)
+
+    X = triangulate(x_r, x_l, K, best_R, best_t)
 
     
     
